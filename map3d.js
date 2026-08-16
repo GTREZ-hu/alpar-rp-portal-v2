@@ -86,6 +86,45 @@
     ['mirror', 'east_highway'], ['east_highway', 'sandy'], ['route68_mid', 'east_highway']
   ];
 
+  const createLightweightTerrain = () => {
+    const group = new THREE.Group();
+    group.name = 'GTAVLightweightTerrain';
+    const terrainGeometry = new THREE.PlaneGeometry(14000, 14000, 28, 28);
+    terrainGeometry.rotateX(-Math.PI / 2);
+    terrainGeometry.vertices.forEach(vertex => {
+      const distance = Math.hypot(vertex.x, vertex.z) / 7000;
+      vertex.y = Math.max(0, distance - .35) * 150 + Math.sin(vertex.x * .0011) * 20 + Math.cos(vertex.z * .0013) * 16;
+    });
+    terrainGeometry.computeVertexNormals();
+    const terrain = new THREE.Mesh(
+      terrainGeometry,
+      new THREE.MeshLambertMaterial({ color: 0x101820, emissive: 0x03080d, side: THREE.DoubleSide })
+    );
+    terrain.name = 'InteractiveTerrain';
+    terrain.position.y = -35;
+    group.add(terrain);
+
+    const grid = new THREE.GridHelper(14000, 70, 0x24586d, 0x172a35);
+    grid.position.y = -30;
+    const gridMaterials = Array.isArray(grid.material) ? grid.material : [grid.material];
+    gridMaterials.forEach(material => { material.transparent = true; material.opacity = .34; });
+    group.add(grid);
+
+    roadEdges.forEach(([fromId, toId]) => {
+      const from = roadNodes.find(node => node.id === fromId);
+      const to = roadNodes.find(node => node.id === toId);
+      if (!from || !to) return;
+      group.add(createLinePath([
+        Object.assign({}, from, { z: 34 }),
+        Object.assign({}, to, { z: 34 })
+      ], '#4fcfff', .46));
+    });
+
+    mapObject = group;
+    raycastTargets = [terrain];
+    scene.add(group);
+  };
+
   const setStatus = text => {
     if (statusText) statusText.textContent = text;
   };
@@ -874,6 +913,24 @@
     routeGroup.name = 'Alpar3DRouteLayer';
     scene.add(routeGroup);
 
+    const activateMap = (mode = 'lightweight') => {
+      setMarkers(demoMarkers);
+      startDemoSimulation();
+      resetView();
+      setProgress(100);
+      setStatus(mode === 'full' ? 'RĂ©szletes 3D tĂ©rkĂ©p aktĂ­v' : 'OptimalizĂˇlt 3D tĂ©rkĂ©p aktĂ­v');
+      if (loaderPanel) loaderPanel.classList.add('is-done');
+      announceMapState('ready', { mode, markers: markerGroup ? markerGroup.children.length : 0 });
+    };
+
+    const parameters = new URLSearchParams(window.location.search);
+    const profileAllowsFullModel = !profile.saveData && (!navigator.hardwareConcurrency || navigator.hardwareConcurrency > 6);
+    const shouldLoadFullModel = parameters.get('detail') === 'full' && profileAllowsFullModel;
+
+    if (!shouldLoadFullModel) {
+      createLightweightTerrain();
+      activateMap('lightweight');
+    } else {
     const manager = new THREE.LoadingManager();
     manager.onProgress = (url, loaded, total) => {
       if (total) setProgress((loaded / total) * 100);
@@ -929,6 +986,7 @@
         resetView();
       });
     });
+    }
 
     stage.addEventListener('pointermove', updateHoverPoint, { passive: true });
     stage.addEventListener('dblclick', handleWaypoint);
