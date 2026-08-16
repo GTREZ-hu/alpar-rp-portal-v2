@@ -924,8 +924,7 @@
     };
 
     const parameters = new URLSearchParams(window.location.search);
-    const profileAllowsFullModel = !profile.saveData && (!navigator.hardwareConcurrency || navigator.hardwareConcurrency > 6);
-    const shouldLoadFullModel = parameters.get('detail') === 'full' && profileAllowsFullModel;
+    const shouldLoadFullModel = parameters.get('detail') !== 'light';
 
     if (!shouldLoadFullModel) {
       createLightweightTerrain();
